@@ -42,11 +42,12 @@ model = lgb.LGBMRegressor(
     n_jobs=-1
 )
 
+model.set_params(verbose=-1)   # Silence warnings (optional)
+
 model.fit(
     X_train, y_train,
     eval_set=[(X_val, y_val)],
-    eval_metric="l2",
-    verbose=100
+    eval_metric="l2"
 )
 
 # Save model
