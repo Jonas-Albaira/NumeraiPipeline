@@ -65,10 +65,9 @@ print("Model saved to:", model_path)
 # -----------------------
 # Predict on live data and prepare submission
 # -----------------------
-live_path = os.path.basename(LIVE_FILE)
-live = pd.read_parquet(live_path)
+live = pd.read_parquet(LIVE_FILE)
 X_live = live[[col for col in live.columns if col.startswith("feature")]]
-preds = model.predict_proba(X_live)[:, 1]
+preds = model.predict(X_live)
 
 submission = live[["id"]].copy()
 submission["prediction"] = preds
