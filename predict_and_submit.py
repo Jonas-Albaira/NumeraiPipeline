@@ -164,7 +164,7 @@ def main(argv=None):
     live = pd.read_parquet(local_live_path)
     LOG.info("Live dataset: %d rows, %d columns", len(live), len(live.columns))
 
-    id_col = find_id_column(live)
+    id_col = "object_id"
     LOG.info("Using id column: %s", id_col)
 
     features = select_feature_columns(live)
