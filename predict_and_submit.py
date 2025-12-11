@@ -3,6 +3,10 @@ import pandas as pd
 import joblib
 from numerapi import NumerAPI
 
+os.environ["NUMERAI_PUBLIC_ID"] = "LXRJTLL43UJTW27LDO4PWUYBRSW5MQAC"
+os.environ["NUMERAI_SECRET_KEY"] = "EJLIK4JF343K224QHSNFMI73WNR55RMEEU3ESFLCITY2B2J5UG4J7Q6U2ZEQ4XIR"
+os.environ["NUMERAI_MODEL_UUID"] = "32601aab-e6d4-432c-aca4-6c36e8ab3691"
+
 # -----------------------
 # Paths
 # -----------------------
