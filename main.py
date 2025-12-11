@@ -53,7 +53,6 @@ model = lgb.LGBMRegressor(
     learning_rate=0.03,
     num_leaves=64,
 )
-
 model.fit(X_train, y_train)
 
 print(f"Training done on {X_train.shape[0]} rows and {X_train.shape[1]} features")
