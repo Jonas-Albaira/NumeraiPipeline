@@ -58,9 +58,6 @@ print(f"Submission saved to {SUB_FILE}.")
 # WARNING: never hardcode keys in production. Use environment variables for security:
 # export NUMERAI_PUBLIC_ID="your_id"
 # export NUMERAI_SECRET_KEY="your_secret"
-public_id = os.getenv("LXRJTLL43UJTW27LDO4PWUYBRSW5MQAC")
-secret_key = os.getenv("EJLIK4JF343K224QHSNFMI73WNR55RMEEU3ESFLCITY2B2J5UG4J7Q6U2ZEQ4XIR")
-model_uuid = os.getenv("32601aab-e6d4-432c-aca4-6c36e8ab3691")  # store your Numerai model UUID here
 
 if public_id is None or secret_key is None or model_uuid is None:
     raise ValueError("Missing Numerai API credentials. Set environment variables.")
