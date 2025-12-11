@@ -31,14 +31,23 @@ print(f"Predictions done for {len(preds)} rows.")
 # -----------------------
 # Prepare submission
 # -----------------------
-submission = live[["row_id"]].copy()
+# Dynamically detect ID column
+id_column = None
+for col in live.columns:
+    if "id" in col.lower():
+        id_column = col
+        break
+
+if id_column is None:
+    raise ValueError("No ID column found in live dataset!")
+
+submission = live[[id_column]].copy()
 submission["prediction"] = preds
 
-# Numerai expects column 'id'
-submission.rename(columns={"row_id": "id"}, inplace=True)
+# Numerai requires column 'id'
+submission.rename(columns={id_column: "id"}, inplace=True)
 submission.to_csv(SUB_FILE, index=False)
 print(f"Submission saved to {SUB_FILE}.")
-
 # -----------------------
 # Upload predictions
 # -----------------------
