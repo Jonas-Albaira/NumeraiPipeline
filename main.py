@@ -59,6 +59,9 @@ X_live = live[features].astype(np.float32)
 
 # ---------- Predict & save submission ----------
 preds = model.predict(X_live)
-submission = pd.DataFrame({"id": live["id"], "prediction": preds})
+submission = pd.DataFrame({
+    "id": live["t_id"],
+    "prediction": preds
+})
 submission.to_csv(SUBMISSION_FILE, index=False)
 print("Saved submission.csv")
