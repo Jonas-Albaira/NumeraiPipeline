@@ -11,6 +11,9 @@ from sklearn.model_selection import train_test_split
 DATA_DIR = "v5.1"
 TRAIN_FILE = os.path.join(DATA_DIR, "train.parquet")
 LIVE_FILE  = os.path.join(DATA_DIR, "live.parquet")
+live = pd.read_parquet(LIVE_FILE)
+print(live.columns)
+print(live.head())
 MODEL_FILE = "numerai_model.joblib"
 SUBMISSION_FILE = "submission.csv"
 
