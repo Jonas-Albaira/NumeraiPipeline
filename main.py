@@ -40,7 +40,12 @@ model = lgb.LGBMRegressor(
     random_state=42,
     n_jobs=-1
 )
-model.fit(X_train, y_train, eval_set=[(X_val, y_val)], verbose=False)
+model.fit(
+    X_train, y_train,
+    eval_set=[(X_val, y_val)],
+    eval_metric="l2",
+    callbacks=[lgb.log_evaluation(0)]  # 0 means silence LightGBM output
+)
 
 joblib.dump(model, MODEL_FILE)
 print("Model saved.")
