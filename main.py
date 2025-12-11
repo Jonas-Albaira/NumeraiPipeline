@@ -59,12 +59,11 @@ napi.download_dataset("v5.1/live.parquet", LIVE_FILE)
 
 live = pd.read_parquet(LIVE_FILE)
 X_live = live[features].astype(np.float32)
-
-# ---------- Predict & save submission ----------
 preds = model.predict(X_live)
+
 submission = pd.DataFrame({
-    "id": live["t_id"],
+    "id": live.index,         # use the index for IDs
     "prediction": preds
 })
-submission.to_csv(SUBMISSION_FILE, index=False)
+submission.to_csv("submission.csv", index=False)
 print("Saved submission.csv")
