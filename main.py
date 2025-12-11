@@ -48,29 +48,32 @@ features = [col for col in train.columns if col.startswith("feature")]
 X_train = train[features]
 y_train = train["target"]
 
-# -----------------------
-# Train LightGBM model
-# -----------------------
-model = lgb.LGBMClassifier(n_estimators=100, learning_rate=0.1)
+model = lgb.LGBMRegressor(
+    n_estimators=300,
+    learning_rate=0.03,
+    num_leaves=64,
+)
+
 model.fit(X_train, y_train)
+
 print(f"Training done on {X_train.shape[0]} rows and {X_train.shape[1]} features")
 
 # Save model
-model_path = os.path.join(DATA_DIR, "numerai_model.joblib")
+model_path = "numerai_model.joblib"
 joblib.dump(model, model_path)
 print("Model saved to:", model_path)
 
 # -----------------------
 # Predict on live data and prepare submission
 # -----------------------
-live_path = os.path.join(DATA_DIR, os.path.basename(LIVE_FILE))
+live_path = os.path.basename(LIVE_FILE)
 live = pd.read_parquet(live_path)
 X_live = live[[col for col in live.columns if col.startswith("feature")]]
 preds = model.predict_proba(X_live)[:, 1]
 
 submission = live[["id"]].copy()
 submission["prediction"] = preds
-sub_file = os.path.join(DATA_DIR, "submission.csv")
+sub_file = "submission.csv"
 submission.to_csv(sub_file, index=False)
 print("Submission saved to:", sub_file)
 
