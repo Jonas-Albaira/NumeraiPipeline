@@ -35,8 +35,6 @@ Author: ChatGPT
 """
 
 
-
-
 LOG = logging.getLogger("predict_and_submit")
 
 

@@ -1,69 +1,43 @@
+#!/usr/bin/env python3
+"""
+Numerai end-to-end pipeline with live parquet download:
+- download latest v5.1 train & tournament datasets
+- train & validate LGBM model
+- save model
+- generate submission.csv
+"""
+
 import os
-import pandas as pd
-import numpy as np
-import lightgbm as lgb
+import sys
 import joblib
+import numpy as np
+import pandas as pd
+import lightgbm as lgb
 from sklearn.model_selection import train_test_split
 from numerapi import NumerAPI
 
-# -----------------------
-# Paths
-# -----------------------
-TRAIN_FILE = "v5.1/train.parquet"
-LIVE_FILE  = "v5.1/live.parquet"
-MODEL_PATH = "numerai_model.joblib"
-SUB_FILE   = "submission.csv"
+# ---------- Config ----------
+DATA_DIR = "v5.1"
+TRAIN_FILE = os.path.join(DATA_DIR, "train.parquet")
+TOURNAMENT_FILE = os.path.join(DATA_DIR, "tournament.parquet")
+MODEL_FILE = "numerai_model.joblib"
+SUBMISSION_FILE = "submission.csv"
+RANDOM_STATE = 42
 
-# -----------------------
-# Load training data
-# -----------------------
-train = pd.read_parquet(TRAIN_FILE)
-features = [c for c in train.columns if c.startswith("feature")]
+# create data directory if missing
+os.makedirs(DATA_DIR, exist_ok=True)
 
-X = train[features].astype(np.float32)
-y = train["target"].astype(np.float32)
-
-# -----------------------
-# Train/validation split
-# -----------------------
-X_train, X_val, y_train, y_val = train_test_split(
-    X, y, test_size=0.2, random_state=42
-)
-print("Train size:", X_train.shape, "Val size:", X_val.shape)
-
-# -----------------------
-# LGBMRegressor Model
-# -----------------------
-model = lgb.LGBMRegressor(
-    n_estimators=1200,
-    learning_rate=0.01,
-    num_leaves=128,
-    colsample_bytree=0.2,
-    subsample=0.8,
-    reg_alpha=5,
-    reg_lambda=5,
-    min_child_weight=50,
-    random_state=42,
-    n_jobs=-1
-)
-
-model.set_params(verbose=-1)  # Silence LightGBM output
-model.fit(X_train, y_train, eval_set=[(X_val, y_val)], eval_metric="l2")
-
-# Save model
-joblib.dump(model, MODEL_PATH)
-print("Model saved.")
-
-# -----------------------
-# Validation metrics
-# -----------------------
+# ---------- Metrics ----------
 def corr(pred, target):
     pred = pred - pred.mean()
     target = target - target.mean()
-    return np.cov(pred, target)[0, 1] / (pred.std() * target.std())
+    cov = np.cov(pred, target)[0, 1]
+    denom = pred.std() * target.std()
+    return cov / denom if denom != 0 else 0.0
 
 def sharpe(pred):
-    return pred.mean() / pred.std()
+    std = pred.std()
+    return pred.mean() / std if std != 0 else 0.0
 
 def mmc(pred, target, baseline=None):
     if baseline is None:
@@ -71,54 +45,72 @@ def mmc(pred, target, baseline=None):
     pred_res = pred - baseline
     return corr(pred_res, target)
 
-val_preds = model.predict(X_val)
-print("\n--- VALIDATION METRICS ---")
-print(f"Validation correlation: {corr(val_preds, y_val):.4f}")
-print(f"Validation Sharpe:      {sharpe(val_preds):.4f}")
-print(f"Validation MMC:         {mmc(val_preds, y_val):.4f}")
-print("\nTraining + validation complete.")
+# ---------- Download live parquet ----------
+print("Downloading latest Numerai datasets...")
+napi = NumerAPI()
 
-# -----------------------
-# Load latest live dataset
-# -----------------------
-sapi = NumerAPI(
-    public_id=os.getenv("NUMERAI_PUBLIC_ID"),
-    secret_key=os.getenv("NUMERAI_SECRET_KEY")
+napi.download_dataset("v5.1/train.parquet", dest_path=TRAIN_FILE)
+napi.download_dataset("v5.1/tournament.parquet", dest_path=TOURNAMENT_FILE)
+
+# ---------- Load training data ----------
+print("Loading training data...")
+train = pd.read_parquet(TRAIN_FILE)
+features = [c for c in train.columns if c.startswith("feature")]
+y = train["target"].astype(np.float32)
+X = train[features].astype(np.float32)
+
+# ---------- Train/validation split ----------
+X_train, X_val, y_train, y_val = train_test_split(
+    X, y, test_size=0.2, random_state=RANDOM_STATE
 )
-sapi.download_dataset("v5.1/live.parquet")
-live = pd.read_parquet(LIVE_FILE)
-features_live = [c for c in live.columns if c.startswith("feature")]
+print("Train size:", X_train.shape, "Val size:", X_val.shape)
 
-# -----------------------
-# Predict on live data
-# -----------------------
-live_preds = model.predict(live[features_live])
-print(f"Predictions done for {len(live_preds)} rows.")
+# ---------- Model ----------
+model = lgb.LGBMRegressor(
+    n_estimators=5000,
+    learning_rate=0.01,
+    num_leaves=128,
+    colsample_bytree=0.2,
+    subsample=0.8,
+    reg_alpha=5,
+    reg_lambda=5,
+    min_child_weight=50,
+    random_state=RANDOM_STATE,
+    n_jobs=-1
+)
+model.set_params(verbose=-1)
 
-# -----------------------
-# Prepare submission
-# -----------------------
-id_column = None
-for col in live.columns:
-    if "id" in col.lower():
-        id_column = col
-        break
+# ---------- Fit with early stopping ----------
+print("Training model...")
+model.fit(
+    X_train, y_train,
+    eval_set=[(X_val, y_val)],
+    eval_metric="l2",
+    early_stopping_rounds=200,
+    callbacks=[lgb.reset_parameter(learning_rate=lambda iter: 0.01)]
+)
 
-if id_column is None:
-    raise ValueError("No ID column found in live dataset!")
+# ---------- Validation metrics ----------
+print("\n--- VALIDATION METRICS ---")
+val_preds = model.predict(X_val)
+print(f"Correlation: {corr(val_preds, y_val):.6f}")
+print(f"Sharpe:      {sharpe(val_preds):.6f}")
+print(f"MMC:         {mmc(val_preds, y_val):.6f}")
 
-submission = live[[id_column]].copy()
-submission["prediction"] = live_preds
-submission.rename(columns={id_column: "id"}, inplace=True)
-submission.to_csv(SUB_FILE, index=False)
-print(f"Submission saved to {SUB_FILE}.")
+# ---------- Save model ----------
+joblib.dump(model, MODEL_FILE)
+print(f"\nSaved model -> {MODEL_FILE}")
 
-# -----------------------
-# Upload predictions
-# -----------------------
-model_uuid = os.getenv("NUMERAI_MODEL_UUID")
-if not model_uuid:
-    raise ValueError("Missing Numerai MODEL UUID. Set NUMERAI_MODEL_UUID env variable.")
+# ---------- Tournament predictions ----------
+print("\nLoading tournament data...")
+tournament = pd.read_parquet(TOURNAMENT_FILE)
+X_tournament = tournament[features].astype(np.float32)
+tournament_preds = model.predict(X_tournament)
 
-sapi.upload_predictions(file_path=SUB_FILE, model_id=model_uuid)
-print("Uploaded predictions successfully!")
+submission = pd.DataFrame({
+    "id": tournament["id"],
+    "prediction": tournament_preds
+})
+submission.to_csv(SUBMISSION_FILE, index=False)
+print(f"Submission saved -> {SUBMISSION_FILE}")
+print("All done!")
